@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graficador de Funciones y Derivadas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@11.6.0/lib/browser/math.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background-color: #f8f9fa;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .slider-container {
+            margin-top: 5px;
+        }
+        
+        .slider-value {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        
+        #plot-container {
+            width: 100%;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        
+        .results {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Configuración de Gráficas</h2>
+        
+        <div class="form-group">
+            <label for="formula1">Fórmula para la función f(x):</label>
+            <input type="text" id="formula1" value="3*x^2 - 3*x + 2">
+        </div>
+        
+        <div class="form-group">
+            <label for="formula2">Fórmula para la derivada f'(x):</label>
+            <input type="text" id="formula2" value="6*x - 3">
+        </div>
+        
+        <div class="form-group">
+            <label for="xRange">Rango de x:</label>
+            <div class="slider-container">
+                <input type="range" id="xRange" min="-10" max="10" step="0.1" value="-5,5" class="slider" multiple>
+            </div>
+            <div class="slider-value" id="xRangeValue">-5 a 5</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="evalXf">Evaluar f(x) en:</label>
+            <input type="number" id="evalXf" value="0" step="0.1">
+        </div>
+        
+        <div class="form-group">
+            <label for="evalXg">Evaluar f'(x) en:</label>
+            <input type="number" id="evalXg" value="0" step="0.1">
+        </div>
+        
+        <div class="form-group">
+            <label for="precision">Precisión de los resultados:</label>
+            <div class="slider-container">
+                <input type="range" id="precision" min="0" max="10" value="2" class="slider">
+            </div>
+            <div class="slider-value" id="precisionValue">2 decimales</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="movePointF">Mover punto sobre f(x):</label>
+            <div class="slider-container">
+                <input type="range" id="movePointF" min="-5" max="5" value="0" step="0.1" class="slider">
+            </div>
+            <div class="slider-value" id="movePointFValue">0</div>
+        </div>
+        
+        <button id="updateBtn">Actualizar Gráfica</button>
+    </div>
+    
+    <div class="main-content">
+        <div id="plot-container">
+            <canvas id="plot"></canvas>
+        </div>
+        
+        <div class="results">
+            <h2>Resultados</h2>
+            <div id="resultF"></div>
+            <div id="resultG"></div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let chart;
+        let xMin = -5;
+        let xMax = 5;
+        
+        // Inicializar la aplicación cuando el DOM esté cargado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Configurar eventos
+            setupEventListeners();
+            
+            // Crear gráfico inicial
+            createChart();
+            
+            // Actualizar gráfico con valores iniciales
+            updateChart();
+        });
+        
+        function setupEventListeners() {
+            // Rango de x
+            const xRangeSlider = document.getElementById('xRange');
+            xRangeSlider.addEventListener('input', function() {
+                const values = this.value.split(',').map(parseFloat);
+                document.getElementById('xRangeValue').textContent = `${values[0].toFixed(1)} a ${values[1].toFixed(1)}`;
+                xMin = values[0];
+                xMax = values[1];
+            });
+            
+            // Precisión
+            const precisionSlider = document.getElementById('precision');
+            precisionSlider.addEventListener('input', function() {
+                document.getElementById('precisionValue').textContent = 
+                    `${this.value} decimal${this.value == 1 ? '' : 'es'}`;
+            });
+            
+            // Punto móvil
+            const movePointFSlider = document.getElementById('movePointF');
+            movePointFSlider.addEventListener('input', function() {
+                document.getElementById('movePointFValue').textContent = this.value;
+            });
+            
+            // Botón de actualización
+            document.getElementById('updateBtn').addEventListener('click', updateChart);
+        }
+        
+        function createChart() {
+            const ctx = document.getElementById('plot').getContext('2d');
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'f(x)',
+                            borderColor: 'blue',
+                            backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: "f'(x)",
+                            borderColor: 'orange',
+                            backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Punto evaluado f(x)',
+                            borderColor: 'red',
+                            backgroundColor: 'red',
+                            borderWidth: 2,
+                            pointRadius: 6,
+                            showLine: false,
+                            data: []
+                        },
+                        {
+                            label: "Punto evaluado f'(x)",
+                            borderColor: 'black',
+                            backgroundColor: 'black',
+                            borderWidth: 2,
+                            pointRadius: 6,
+                            showLine: false,
+                            data: []
+                        },
+                        {
+                            label: 'Punto móvil f(x)',
+                            borderColor: 'blue',
+                            backgroundColor: 'blue',
+                            borderWidth: 2,
+                            pointRadius: 6,
+                            showLine: false,
+                            data: []
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'center',
+                            title: {
+                                display: true,
+                                text: 'x'
+                            },
+                            grid: {
+                                color: function(context) {
+                                    return context.tick.value === 0 ? 'black' : 'rgba(0, 0, 0, 0.1)';
+                                },
+                                lineWidth: function(context) {
+                                    return context.tick.value === 0 ? 1 : 0.5;
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'center',
+                            title: {
+                                display: true,
+                                text: 'y'
+                            },
+                            grid: {
+                                color: function(context) {
+                                    return context.tick.value === 0 ? 'black' : 'rgba(0, 0, 0, 0.1)';
+                                },
+                                lineWidth: function(context) {
+                                    return context.tick.value === 0 ? 1 : 0.5;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Gráfica de las funciones definidas por el usuario',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateChart() {
+            // Obtener valores de los controles
+            const formula1 = document.getElementById('formula1').value;
+            const formula2 = document.getElementById('formula2').value;
+            const evalXf = parseFloat(document.getElementById('evalXf').value);
+            const evalXg = parseFloat(document.getElementById('evalXg').value);
+            const precision = parseInt(document.getElementById('precision').value);
+            const movePointF = parseFloat(document.getElementById('movePointF').value);
+            
+            // Generar datos para las funciones
+            const { xValues, yValuesF, yValuesG } = generateFunctionData(formula1, formula2, xMin, xMax, 400);
+            
+            // Evaluar puntos específicos
+            const pointF = evaluatePoint(formula1, evalXf, precision);
+            const pointG = evaluatePoint(formula2, evalXg, precision);
+            const movePoint = evaluatePoint(formula1, movePointF, precision);
+            
+            // Actualizar gráfico
+            chart.data.labels = xValues;
+            chart.data.datasets[0].data = xValues.map((x, i) => ({x, y: yValuesF[i]}));
+            chart.data.datasets[0].label = `f(x) = ${formula1}`;
+            chart.data.datasets[1].data = xValues.map((x, i) => ({x, y: yValuesG[i]}));
+            chart.data.datasets[1].label = `f'(x) = ${formula2}`;
+            chart.data.datasets[2].data = pointF ? [pointF] : [];
+            chart.data.datasets[2].label = pointF ? `Punto f(${evalXf}) = ${pointF.y.toFixed(precision)}` : 'Punto evaluado f(x)';
+            chart.data.datasets[3].data = pointG ? [pointG] : [];
+            chart.data.datasets[3].label = pointG ? `Punto f'(${evalXg}) = ${pointG.y.toFixed(precision)}` : "Punto evaluado f'(x)";
+            chart.data.datasets[4].data = movePoint ? [movePoint] : [];
+            chart.data.datasets[4].label = movePoint ? `Punto móvil f(${movePointF}) = ${movePoint.y.toFixed(precision)}` : 'Punto móvil f(x)';
+            
+            chart.update();
+            
+            // Actualizar resultados
+            updateResults(pointF, pointG, precision);
+        }
+        
+        function generateFunctionData(formula1, formula2, xMin, xMax, numPoints) {
+            const xValues = [];
+            const yValuesF = [];
+            const yValuesG = [];
+            
+            for (let i = 0; i < numPoints; i++) {
+                const x = xMin + (xMax - xMin) * i / (numPoints - 1);
+                xValues.push(x);
+                
+                try {
+                    const scope = {x: x};
+                    yValuesF.push(math.evaluate(formula1, scope));
+                } catch (e) {
+                    yValuesF.push(NaN);
+                }
+                
+                try {
+                    const scope = {x: x};
+                    yValuesG.push(math.evaluate(formula2, scope));
+                } catch (e) {
+                    yValuesG.push(NaN);
+                }
+            }
+            
+            return { xValues, yValuesF, yValuesG };
+        }
+        
+        function evaluatePoint(formula, xValue, precision) {
+            if (isNaN(xValue)) return null;
+            
+            try {
+                const scope = {x: xValue};
+                const yValue = math.evaluate(formula, scope);
+                return {x: xValue, y: yValue};
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function updateResults(pointF, pointG, precision) {
+            const resultFElement = document.getElementById('resultF');
+            const resultGElement = document.getElementById('resultG');
+            
+            if (pointF) {
+                resultFElement.innerHTML = `<strong>f(${pointF.x})</strong> = ${pointF.y.toFixed(precision)}`;
+            } else {
+                resultFElement.textContent = "Error al evaluar f(x)";
+            }
+            
+            if (pointG) {
+                resultGElement.innerHTML = `<strong>f'(${pointG.x})</strong> = ${pointG.y.toFixed(precision)}`;
+            } else {
+                resultGElement.textContent = "Error al evaluar f'(x)";
+            }
+        }
+    </script>
+</body>
+</html>
